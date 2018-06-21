@@ -8,8 +8,8 @@ import os
 import pathlib
 
 HELP = """
-Batch bsub launcher. Default config for script (location ~/.gpubatch.conf) should look like
-
+Batch bsub launcher. Default config for script (location `~/.gpubatch.conf`) should look like
+```
 > cat config
 [gpubatch]
 batch=1
@@ -25,7 +25,23 @@ header=
     #BSUB option2
     #BSUB option3
     custom code you want
----------------------------------
+```
+
+Examples
+--------
+
+```
+# batch by -1
+# yields 1 job
+> gpu-batch.sub 'python script_1.py' 'python script_2.py' 'python script_2.py --other-args'
+
+# batch by 2
+# yields 2 jobs
+> gpu-batch.sub -b 2 'python script_1.py' 'python script_2.py' 'python script_2.py --other-args'
+
+# run from file
+> gpu-batch.sub -b 2 -f filewithjobs1 filewithjobs2 filewithjobs3
+```
 """
 
 CONFIG_PATH_DEFAULT = str(pathlib.Path.home()/'.gpubatch.conf')
@@ -46,11 +62,34 @@ mkdir -p $err
 JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOB_ID}-$batch.out 2> $err/$name-${LSB_JOB_ID}-$batch.err")
 
 
+def possibly_multiline_jobs(lines):
+    jobs = []
+    buffer = ''
+    for line in lines:
+        line = line.strip()
+        if line.endswith('\\'):
+            # next line is the continuation of the command
+            # add line tu buffer, add multiline and continue
+            buffer += line + '\n'
+        else:
+            if line:
+                buffer += line
+            # empty line new command next
+            # add job, free buffer and continue
+            if buffer:
+                jobs.append(buffer)
+            buffer = ''
+    return jobs
+
+
 def to_batch(iterable, n):
-    sourceiter = iter(iterable)
-    while True:
-        batchiter = islice(sourceiter, n)
-        yield chain([next(batchiter)], batchiter)
+    if n == -1:
+        yield iter(iterable)
+    else:
+        sourceiter = iter(iterable)
+        while True:
+            batchiter = islice(sourceiter, n)
+            yield chain([next(batchiter)], batchiter)
 
 
 def parallel_jobs(jobs,  name: str, out: pathlib.Path, err: pathlib.Path):
@@ -92,10 +131,10 @@ if __name__ == '__main__':
         conf = configparser.ConfigParser(comment_prefixes=(';',))
         conf.read([CONFIG_PATH_DEFAULT])
         defaults.update(conf.items('gpubatch'))
-    parser = argparse.ArgumentParser(HELP)
+    parser = argparse.ArgumentParser(HELP, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--batch', '-b', type=int,
-                        default=defaults.get('batch', 1),
-                        help='number of jobs in batch')
+                        default=defaults.get('batch', -1),
+                        help='number of jobs in batch where -1 stands for unlimited batch')
     parser.add_argument('--gpu', '-g', type=int,
                         default=defaults.get('gpu', 1),
                         help='number of gpu per batch')
@@ -112,17 +151,19 @@ if __name__ == '__main__':
                         default=defaults.get('hosts', ''),
                         help='allowed hosts')
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--file', '-f', type=argparse.FileType('r'),
-                       help='Read jobs from file', default=None)
+    group.add_argument('--files', '-f', type=argparse.FileType('r'),
+                       nargs='+',
+                       help='Read jobs from file', default=[])
     group.add_argument('jobs', nargs='*',
-                       help="jobs to execute like 'python script.py'", default=[])
+                       default=[],
+                       help="jobs to execute like 'python script.py', you can specify either files or explicit jobs")
     parser.add_argument('--queue', '-q', type=str, default=defaults.get('queue', 'normal'),
                         help='queue name')
     parser.add_argument('--debug', action='store_true', help='prints commands to execute first')
 
     args = parser.parse_args()
-    if args.file:
-        args.jobs = args.file.readlines()
+    if args.files:
+        args.jobs = sum((possibly_multiline_jobs(f.readlines()) for f in args.files), [])
 
     submits = bsub_submits(
         jobs=args.jobs,
