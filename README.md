@@ -7,8 +7,6 @@ pip install git+https://github.com/ferrine/gpu-batch.sub
 
 ```
 
-Batch bsub launcher.
-
 Example Config
 --------------
 Default config for script (location `~/.gpubatch.conf`) should look like
