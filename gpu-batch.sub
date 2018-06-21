@@ -18,7 +18,7 @@ gpu=1
 ;paths are relative
 out=bsub-log/out
 err=bsub-log/err
-hosts=host1,host2,host3
+hosts=host1 host2 host3
 queue=normal
 header=
     #BSUB option1
@@ -60,7 +60,7 @@ cd ${LS_SUBCWD}
 mkdir -p $out
 mkdir -p $err
 """)
-JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOB_ID}-$batch.out 2> $err/$name-${LSB_JOB_ID}-$batch.err")
+JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOBID}-$batch.out 2> $err/$name-${LSB_JOBID}-$batch.err")
 
 
 def possibly_multiline_jobs(lines):
