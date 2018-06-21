@@ -100,8 +100,8 @@ def parallel_jobs(jobs,  name: str, out: pathlib.Path, err: pathlib.Path):
     return BSUB_WORKING_DIR.safe_substitute(out=out, err=err) + ' &\\\n'.join(jobs) + '\n'
 
 
-def bsub_command(job: str, header: str, name: str, gpu: int, queue: str, hosts: str):
-    command = BSUB_TEMPLATE.substitute(hosts=hosts, gpu=gpu, queue=queue, name=name)
+def bsub_command(job: str, header: str, out: pathlib.Path, name: str, gpu: int, queue: str, hosts: str):
+    command = BSUB_TEMPLATE.substitute(hosts=hosts, gpu=gpu, queue=queue, name=name, out=out)
     if hosts:
         command += '#BSUB -m "%s"\n' % hosts
     if header:
@@ -122,7 +122,7 @@ def bsub_submits(
         gpu: int,
 ):
     jobs = [parallel_jobs(chunks, name=name, out=out, err=err) for chunks in to_batch(jobs, batch_size)]
-    commands = [bsub_command(job, header=header, gpu=gpu, queue=queue, hosts=hosts, name=name) for job in jobs]
+    commands = [bsub_command(job, header=header, gpu=gpu, queue=queue, hosts=hosts, name=name, out=out) for job in jobs]
     return commands
 
 
