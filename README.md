@@ -42,8 +42,9 @@ Examples
 # run from file
 > gpu-batch.sub -b 2 -f filewithjobs1 filewithjobs2 filewithjobs3
 > cat filewithjobs1
-multiline \
+multiline \ # comments are ok
     job number one
+# comments here are ok too
 multiline \
     job number two
 

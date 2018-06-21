@@ -47,8 +47,9 @@ Examples
 # run from file
 > gpu-batch.sub -b 2 -f filewithjobs1 filewithjobs2 filewithjobs3
 > cat filewithjobs1
-multiline \
+multiline \ # comments are ok
     job number one
+# comments here are ok too
 multiline \
     job number two
 
@@ -115,7 +116,14 @@ def possibly_multiline_jobs(lines):
     buffer = ''
     for line in lines:
         # remove comments and rstrip
-        line = line.split('#', 1)[0].rstrip()
+        line = line.split('#', 1)
+        if not line:
+            if buffer:
+                jobs.append(buffer)
+            buffer = ''
+            continue
+        else:
+            line = line[0].rstrip()
         if line.endswith('\\'):
             # next line is the continuation of the command
             # add line tu buffer, add multiline and continue
