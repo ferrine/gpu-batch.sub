@@ -38,6 +38,11 @@ BSUB_TEMPLATE = Template("""\
 #BSUB -J $name
 #BSUB -gpu "num=$gpu:mode=exclusive_process"
 """)
+BSUB_WORKING_DIR = Template("""\
+cd ${LS_SUBCWD}
+mkdir -p $out
+mkdir -p $err
+""")
 JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOB_ID}-$batch.out 2> $err/$name-${LSB_JOB_ID}-$batch.err")
 
 
@@ -52,7 +57,7 @@ def parallel_jobs(jobs,  name: str, out: pathlib.Path, err: pathlib.Path):
     jobs = [JOB_TEMPLATE.safe_substitute(
         job=job, name=name, out=out, err=err, batch=batch
     ) for batch, job in enumerate(jobs)]
-    return ' &\\\n'.join(jobs) + '\n'
+    return BSUB_WORKING_DIR.safe_substitute(out=out, err=err) + ' &\\\n'.join(jobs) + '\n'
 
 
 def bsub_command(job: str, header: str, name: str, gpu: int, queue: str, hosts: str):
