@@ -53,6 +53,7 @@ BSUB_TEMPLATE = Template("""\
 #BSUB -n $gpu
 #BSUB -J $name
 #BSUB -gpu "num=$gpu:mode=exclusive_process"
+#BSUB -o $out/$name-%J-stats.out
 """)
 BSUB_WORKING_DIR = Template("""\
 cd ${LS_SUBCWD}
