@@ -7,6 +7,7 @@ import argparse
 import os
 import re
 import pathlib
+__version__ = '0.0.1'
 
 HELP = r"""
 Batch bsub launcher. 
@@ -213,9 +214,16 @@ if __name__ == '__main__':
                        help="jobs to execute like 'python script.py', you can specify either files or explicit jobs")
     parser.add_argument('--queue', '-q', type=str, default=defaults.get('queue', 'normal'),
                         help='queue name')
-    parser.add_argument('--debug', action='store_true', help='prints commands to execute first')
+    parser.add_argument('--debug', action='store_true',
+                        help='prints commands to execute first')
+    parser.add_argument('--version', action='store_true',
+                        help='print version and exit')
 
     args = parser.parse_args()
+    if args.version:
+        import sys
+        print(__version__)
+        sys.exit(0)
     if args.files:
         args.jobs = sum((possibly_multiline_jobs(f.readlines()) for f in args.files), [])
 
