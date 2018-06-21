@@ -67,7 +67,7 @@ def possibly_multiline_jobs(lines):
     jobs = []
     buffer = ''
     for line in lines:
-        line = line.strip()
+        line = line.rstrip()
         if line.endswith('\\'):
             # next line is the continuation of the command
             # add line tu buffer, add multiline and continue
