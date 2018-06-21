@@ -5,14 +5,19 @@ from itertools import islice, chain
 from string import Template
 import argparse
 import os
+import re
 import pathlib
 
-HELP = """
-Batch bsub launcher. Default config for script (location `~/.gpubatch.conf`) should look like
+HELP = r"""
+Batch bsub launcher. 
+
+Example Config
+--------------
+Default config for script (location `~/.gpubatch.conf`) should look like
 ```
 > cat config
 [gpubatch]
-batch=1
+batch=-1
 gpu=1
 ; use ';' for comments
 ;paths are relative
@@ -29,7 +34,6 @@ header=
 
 Examples
 --------
-
 ```
 # batch by -1
 # yields 1 job
@@ -41,7 +45,48 @@ Examples
 
 # run from file
 > gpu-batch.sub -b 2 -f filewithjobs1 filewithjobs2 filewithjobs3
+> cat filewithjobs1
+multiline \
+    job number one
+multiline \
+    job number two
+
+# naming jobs
+# special syntax is applied (no spaces allowed in jobname)
+gpu-batch.sub 'jobname : python script1.py'
 ```
+
+Checking Command Submission
+---------------------------
+```
+# in project dir (path/to/gpu-batch.sub)
+> gpu-batch.sub --debug command1 named:command2
+>>>>>>>>>>
+#SUBMIT: 0
+vvvvvvvvvv
+#!/bin/sh
+#BSUB -q normal
+#BSUB -n 1
+#BSUB -J gpu-batch.sub
+#BSUB -gpu "num=1:mode=exclusive_process"
+#BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
+cd ${LS_SUBCWD}
+mkdir -p bsub-log/out
+mkdir -p bsub-log/err
+command1 >\
+  bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.err &\
+command2 >\
+  bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1-named.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1-named.err
+```
+
+Where
+
+- general summary
+    `bsub-log/out/gpu-batch.sub-%J-stats.out`
+- stdout/stderr for job1
+    `bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.out`; `bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.err`
+- stdout/stderr for job2
+    `bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1-named.out`; `bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1-named.err`
 """
 
 CONFIG_PATH_DEFAULT = str(pathlib.Path.home()/'.gpubatch.conf')
@@ -61,13 +106,15 @@ mkdir -p $out
 mkdir -p $err
 """)
 JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOBID}-$batch.out 2> $err/$name-${LSB_JOBID}-$batch.err")
+JOB_REGEX = re.compile(r'^((?:\s+)?(?P<name>[_a-zA-Z0-9-]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?')
 
 
 def possibly_multiline_jobs(lines):
     jobs = []
     buffer = ''
     for line in lines:
-        line = line.rstrip()
+        # remove comments and rstrip
+        line = line.split('#', 1)[0].rstrip()
         if line.endswith('\\'):
             # next line is the continuation of the command
             # add line tu buffer, add multiline and continue
@@ -94,10 +141,16 @@ def to_batch(iterable, n):
 
 
 def parallel_jobs(jobs,  name: str, out: pathlib.Path, err: pathlib.Path):
-    jobs = [JOB_TEMPLATE.safe_substitute(
-        job=job, name=name, out=out, err=err, batch=batch
-    ) for batch, job in enumerate(jobs)]
-    return BSUB_WORKING_DIR.safe_substitute(out=out, err=err) + ' &\\\n'.join(jobs) + '\n'
+    job_commands = []
+    for j, job in enumerate(jobs):
+        jobd = JOB_REGEX.match(job)
+        job_commands.append(
+            JOB_TEMPLATE.safe_substitute(
+                job=jobd['command'], name=name, out=out, err=err,
+                batch='%d-%s' % (j, jobd['name']) if jobd['name'] else j)
+        )
+
+    return BSUB_WORKING_DIR.safe_substitute(out=out, err=err) + ' &\\\n'.join(job_commands) + '\n'
 
 
 def bsub_command(job: str, header: str, out: pathlib.Path, name: str, gpu: int, queue: str, hosts: str):
