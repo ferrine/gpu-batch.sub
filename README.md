@@ -13,7 +13,7 @@ Default config for script (location `~/.gpubatch.conf`) should look like
 ```
 > cat config
 [gpubatch]
-batch=1
+batch=-1
 gpu=1
 ; use ';' for comments
 ;paths are relative
