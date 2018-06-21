@@ -1,4 +1,15 @@
-Batch bsub launcher. Default config for script (location `~/.gpubatch.conf`) should look like
+Batch bsub launcher. 
+
+Installation
+------------
+```
+pip install git+https://github.com/ferrine/gpu-batch.sub
+
+```
+
+Config
+------
+Default config for script (location `~/.gpubatch.conf`) should look like
 ```
 > cat config
 [gpubatch]
