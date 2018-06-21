@@ -12,6 +12,7 @@ Batch bsub launcher. Default config for script (location ~/.gpubatch.conf) shoul
 
 > cat config
 [gpubatch]
+batch=1
 gpu=1
 ; use ';' for comments
 ;paths are relative
@@ -24,6 +25,7 @@ header=
     #BSUB option2
     #BSUB option3
     custom code you want
+---------------------------------
 """
 
 CONFIG_PATH_DEFAULT = str(pathlib.Path.home()/'.gpubatch.conf')
