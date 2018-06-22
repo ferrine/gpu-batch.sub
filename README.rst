@@ -9,6 +9,8 @@ Installation / Update
 ::
 
     pip install -U git+https://github.com/ferrine/gpu-batch.sub
+    # or
+    pip install -U gpu-batch-sub
 
 Example Config
 --------------
