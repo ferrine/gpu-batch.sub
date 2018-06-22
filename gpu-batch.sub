@@ -108,7 +108,7 @@ mkdir -p $out
 mkdir -p $err
 """)
 JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOBID}-$batch.out 2> $err/$name-${LSB_JOBID}-$batch.err")
-JOB_REGEX = re.compile(r'^((?:\s+)?(?P<name>[_a-zA-Z0-9-]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?')
+JOB_REGEX = re.compile(r'^((?:\s+)?(?P<name>[_a-zA-Z0-9-.]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?')
 
 
 def possibly_multiline_jobs(lines):
@@ -152,7 +152,7 @@ def to_batch(iterable, n):
 def parallel_jobs(jobs,  name: str, out: pathlib.Path, err: pathlib.Path):
     job_commands = []
     for j, job in enumerate(jobs):
-        jobd = JOB_REGEX.match(job)
+        jobd = JOB_REGEX.match(job).groupdict()
         job_commands.append(
             JOB_TEMPLATE.safe_substitute(
                 job=jobd['command'], name=name, out=out, err=err,
