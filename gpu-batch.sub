@@ -21,7 +21,7 @@ shared or exclusive (not recommended) mode.
 EPILOG = """
 Default settings are stored in `$HOME/.gpubatch.conf`.
 They will override the help message as well. Possible settings for config file:
-batch, gpu, hosts, header, queue. Header will appended to LSF submission file as is, 
+batch, gpu, hosts, header, queue. Header will be appended to LSF submission file as is, 
 there is no default extra header.
 """
 BSUB_TEMPLATE = Template("""\
