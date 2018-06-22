@@ -99,7 +99,7 @@ BSUB_TEMPLATE = Template("""\
 #BSUB -q $queue
 #BSUB -n $gpu
 #BSUB -J $name
-#BSUB -gpu "num=$gpu:mode=exclusive_process"
+#BSUB -gpu "num=$gpu:mode=shared"
 #BSUB -o $out/$name-%J-stats.out
 """)
 BSUB_WORKING_DIR = Template("""\
