@@ -214,13 +214,14 @@ if __name__ == '__main__':
                         default=defaults.get('hosts', ''),
                         help='allowed hosts')
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--files', '-f', type=argparse.FileType('r'),
-                       nargs='+',
-                       help='Read jobs from file', default=[])
+    group.add_argument('--files', '-f', type=argparse.FileType('r'), nargs='+',
+                       default=[],
+                       help='Read jobs from file')
     group.add_argument('jobs', nargs='*',
                        default=[],
                        help="jobs to execute like 'python script.py', you can specify either files or explicit jobs")
-    parser.add_argument('--queue', '-q', type=str, default=defaults.get('queue', 'normal'),
+    parser.add_argument('--queue', '-q', type=str,
+                        default=defaults.get('queue', 'normal'),
                         help='queue name')
     parser.add_argument('--debug', action='store_true',
                         help='prints commands to execute first')
