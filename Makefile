@@ -15,4 +15,6 @@ readme:
 	@echo '```' 						>> README.md
 	@./gpu-batch.sub --help >> README.md
 	@echo '```' 						>> README.md
+	@pandoc --from=markdown --to=rst --output=README.rst README.md
+	@rm README.md
 

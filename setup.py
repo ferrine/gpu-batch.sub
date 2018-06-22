@@ -14,16 +14,24 @@ def get_version():
 
 if __name__ == '__main__':
     try:
-        long_desc = open('README.md').read()
+        LONG_DESC = open('README.md').read()
     except FileNotFoundError:
-        long_desc = None
+        LONG_DESC = None
 
     setup(
-        name='gpu-batch',
+        name='gpu-batch-sub',
         description='Batch bsub launcher',
-        long_description=long_desc,
+        long_description=LONG_DESC,
         version=get_version(),
-        author='Maxim Kochurov <maxim.v.kochurov@gmail.com>',
+        author='Maxim Kochurov',
+        author_email='maxim.v.kochurov@gmail.com',
         python_requires='>=3.5',
         scripts=['gpu-batch.sub'],
+        license="Apache License, Version 2.0",
+        classifiers=(
+            'Programming Language :: Python :: 3',
+            'License :: OSI Approved :: Apache Software License',
+            'Topic :: Scientific/Engineering',
+            'Operating System :: Linux'
+        )
     )
