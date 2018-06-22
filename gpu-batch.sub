@@ -9,97 +9,27 @@ import re
 import pathlib
 __version__ = '0.0.1'
 
-HELP = r"""
-Batch bsub launcher. 
-
-Example Config
---------------
-Default config for script (location `~/.gpubatch.conf`) should look like
-```
-> cat config
-[gpubatch]
-batch=-1
-gpu=1
-; use ';' for comments
-;paths are relative
-out=bsub-log/out
-err=bsub-log/err
-hosts=host1 host2 host3
-queue=normal
-header=
-    #BSUB option1
-    #BSUB option2
-    #BSUB option3
-    custom code you want
-```
-
-Examples
---------
-```
-# batch by -1
-# yields 1 job
-> gpu-batch.sub 'python script_1.py' 'python script_2.py' 'python script_2.py --other-args'
-
-# batch by 2
-# yields 2 jobs
-> gpu-batch.sub -b 2 'python script_1.py' 'python script_2.py' 'python script_2.py --other-args'
-
-# run from file
-> gpu-batch.sub -b 2 -f filewithjobs1 filewithjobs2 filewithjobs3
-> cat filewithjobs1
-multiline \ # comments are ok
-    job number one
-# comments here are ok too
-multiline \
-    job number two
-
-# naming jobs
-# special syntax is applied (no spaces allowed in jobname)
-gpu-batch.sub 'jobname : python script1.py'
-```
-
-Checking Command Submission
----------------------------
-```
-# in project dir (path/to/gpu-batch.sub)
-> gpu-batch.sub --debug command1 named:command2
->>>>>>>>>>
-#SUBMIT: 0
-vvvvvvvvvv
-#!/bin/sh
-#BSUB -q normal
-#BSUB -n 1
-#BSUB -J gpu-batch.sub
-#BSUB -gpu "num=1:mode=exclusive_process"
-#BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
-cd ${LS_SUBCWD}
-mkdir -p bsub-log/out
-mkdir -p bsub-log/err
-command1 >\
-  bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.err &\
-command2 >\
-  bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1-named.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1-named.err
-```
-
-Where
-
-- general summary
-    `bsub-log/out/gpu-batch.sub-%J-stats.out`
-- stdout/stderr for job1
-    `bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.out`; `bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.err`
-- stdout/stderr for job2
-    `bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1-named.out`; `bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1-named.err`
-"""
-
 CONFIG_PATH_DEFAULT = str(pathlib.Path.home()/'.gpubatch.conf')
+ARGS_NAME_DEFAULT = '$(basename `pwd`)'
 
-
+DESCRIPTION = """
+%(prog)s is a util to wrap submissions to LSF in a batch. It automatically
+collects jobs, prepares submission file you can check beforehand with `--debug` flag.
+`gpu-batch.sub` asks LSF for desired number of GPU per batch and allocates them in 
+shared or exclusive (not recommended) mode.
+"""
+EPILOG = """
+Default settings are stored in `$HOME/.gpubatch.conf`.
+They will override the help message as well. Possible settings for config file:
+batch, gpu, hosts, header, queue. Header will appended to LSF submission file as is, 
+there is no default extra header.
+"""
 BSUB_TEMPLATE = Template("""\
 #!/bin/sh
 #BSUB -q $queue
 #BSUB -n $gpu
 #BSUB -J $name
-#BSUB -gpu "num=$gpu:mode=shared"
+#BSUB -gpu "num=$gpu:mode=$gpu_mode"
 #BSUB -o $out/$name-%J-stats.out
 """)
 BSUB_WORKING_DIR = Template("""\
@@ -109,6 +39,7 @@ mkdir -p $err
 """)
 JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOBID}-$batch.out 2> $err/$name-${LSB_JOBID}-$batch.err")
 JOB_REGEX = re.compile(r'^((?:\s+)?(?P<name>[_a-zA-Z0-9-.]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?')
+HOSTS_SUB_REGEX = re.compile('( |,)+')
 
 
 def possibly_multiline_jobs(lines):
@@ -149,7 +80,12 @@ def to_batch(iterable, n):
             yield chain([next(batchiter)], batchiter)
 
 
-def parallel_jobs(jobs,  name: str, out: pathlib.Path, err: pathlib.Path):
+def parallel_jobs(
+        jobs,
+        name: str,
+        out: pathlib.Path,
+        err: pathlib.Path
+):
     job_commands = []
     for j, job in enumerate(jobs):
         jobd = JOB_REGEX.match(job).groupdict()
@@ -162,8 +98,18 @@ def parallel_jobs(jobs,  name: str, out: pathlib.Path, err: pathlib.Path):
     return BSUB_WORKING_DIR.safe_substitute(out=out, err=err) + ' &\\\n'.join(job_commands) + '\n'
 
 
-def bsub_command(job: str, header: str, out: pathlib.Path, name: str, gpu: int, queue: str, hosts: str):
-    command = BSUB_TEMPLATE.substitute(hosts=hosts, gpu=gpu, queue=queue, name=name, out=out)
+def bsub_command(
+        job: str,
+        name: str,
+        out: pathlib.Path,
+        queue: str,
+        hosts: str,
+        gpu: int,
+        gpu_mode: str,
+        header: str
+):
+    command = BSUB_TEMPLATE.substitute(hosts=hosts, gpu=gpu, queue=queue,
+                                       name=name, out=out, gpu_mode=gpu_mode)
     if hosts:
         command += '#BSUB -m "%s"\n' % hosts
     if header:
@@ -174,7 +120,6 @@ def bsub_command(job: str, header: str, out: pathlib.Path, name: str, gpu: int, 
 
 def bsub_submits(
         jobs,
-        header: str,
         name: str,
         out: pathlib.Path,
         err: pathlib.Path,
@@ -182,9 +127,12 @@ def bsub_submits(
         queue: str,
         hosts: str,
         gpu: int,
+        gpu_mode: str,
+        header: str,
 ):
-    jobs = [parallel_jobs(chunks, name=name, out=out, err=err) for chunks in to_batch(jobs, batch_size)]
-    commands = [bsub_command(job, header=header, gpu=gpu, queue=queue, hosts=hosts, name=name, out=out) for job in jobs]
+    jobs = (parallel_jobs(chunks, name=name, out=out, err=err) for chunks in to_batch(jobs, batch_size))
+    commands = [bsub_command(job, header=header, gpu=gpu, queue=queue,
+                             hosts=hosts, name=name, out=out, gpu_mode=gpu_mode) for job in jobs]
     return commands
 
 
@@ -194,39 +142,54 @@ if __name__ == '__main__':
         conf = configparser.ConfigParser(comment_prefixes=(';',))
         conf.read([CONFIG_PATH_DEFAULT])
         defaults.update(conf.items('gpubatch'))
-    parser = argparse.ArgumentParser(HELP, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description=DESCRIPTION, epilog=EPILOG,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--batch', '-b', type=int,
                         default=defaults.get('batch', -1),
-                        help='number of jobs in batch where -1 stands for unlimited batch')
+                        help='Number of jobs in batch where -1 stands for unlimited batch')
     parser.add_argument('--gpu', '-g', type=int,
                         default=defaults.get('gpu', 1),
-                        help='number of gpu per batch')
+                        help='Number of gpu per batch')
     parser.add_argument('--out', '-o', type=pathlib.Path,
                         default=defaults.get('out', pathlib.Path('bsub-log', 'out')),
-                        help='output path for stdout')
+                        help='Output path for stdout')
     parser.add_argument('--err', '-e', type=pathlib.Path,
                         default=defaults.get('err', pathlib.Path('bsub-log', 'err')),
-                        help='output path for stderr')
+                        help='Output path for stderr')
     parser.add_argument('--name', '-n', type=str,
-                        default=pathlib.Path.cwd().name,
-                        help='name for job, defaults to base directory of execution')
+                        default=ARGS_NAME_DEFAULT,
+                        help='Name for job, defaults to base directory of execution')
     parser.add_argument('--hosts', type=str,
                         default=defaults.get('hosts', ''),
-                        help='allowed hosts')
+                        help='Space or comma separated allowed hosts. '
+                             'Empty string holds for ALL visible hosts. '
+                             'It is suggested to specify hosts in `.conf` file. '
+                             'Passing hosts in command line looks like '
+                             "`--hosts ''` for ALL or `--hosts 'host1,host2'` for 2 hosts")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--files', '-f', type=argparse.FileType('r'), nargs='+',
                        default=[],
-                       help='Read jobs from file')
-    group.add_argument('jobs', nargs='*',
+                       help='Read jobs from files. File can contain multiline jobs for readability')
+    group.add_argument('jobs', nargs='*', type=str,
                        default=[],
-                       help="jobs to execute like 'python script.py', you can specify either files or explicit jobs")
+                       help="Jobs to execute (e.g. 'python script.py') enclosed as strings, "
+                            "you can specify either files or explicit jobs in command line. "
+                            "Multiline jobs in files are supported. Optional naming schema for jobs has "
+                            "the following syntax 'name:command'")
     parser.add_argument('--queue', '-q', type=str,
                         default=defaults.get('queue', 'normal'),
-                        help='queue name')
+                        help='Queue name')
+    parser.add_argument('--exclusive', '-x', action='store_const',
+                        default='shared',
+                        const='exclusive',
+                        dest='gpu_mode',
+                        help='Exclusive GPU mode is possible but not recommended in most cases. Exclusive mode ' 
+                             'allocates GPU only for 1 separate process. As a side effect it '
+                             'breaks batched jobs and applicable only for 1 job per batch')
     parser.add_argument('--debug', action='store_true',
-                        help='prints commands to execute first')
+                        help='Print submissions and exit')
     parser.add_argument('--version', action='store_true',
-                        help='print version and exit')
+                        help='Print version and exit')
 
     args = parser.parse_args()
     if args.version:
@@ -235,7 +198,10 @@ if __name__ == '__main__':
         sys.exit(0)
     if args.files:
         args.jobs = sum((possibly_multiline_jobs(f.readlines()) for f in args.files), [])
-
+    if args.name == ARGS_NAME_DEFAULT:
+        args.name = pathlib.Path.cwd().name
+    if args.hosts:
+        args.hosts = HOSTS_SUB_REGEX.sub(' ', args.hosts)
     submits = bsub_submits(
         jobs=args.jobs,
         header=defaults.get('header', ''),
@@ -246,6 +212,7 @@ if __name__ == '__main__':
         batch_size=args.batch,
         gpu=args.gpu,
         hosts=args.hosts,
+        gpu_mode=args.gpu_mode
     )
     if args.debug:
         for i, submit in enumerate(submits):

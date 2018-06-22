@@ -1,9 +1,11 @@
-Batch bsub launcher. 
+Batch bsub launcher
+===================
+Pure python script to create batched GPU jobs using BSUB
 
-Installation
-------------
+Installation / Update
+---------------------
 ```
-pip install git+https://github.com/ferrine/gpu-batch.sub
+pip install -U git+https://github.com/ferrine/gpu-batch.sub
 
 ```
 
@@ -55,9 +57,9 @@ gpu-batch.sub 'jobname : python script1.py'
 
 Checking Command Submission
 ---------------------------
+`--debug` flag helps to print expected submissions to LSF
 ```
-# in project dir (path/to/gpu-batch.sub)
-> gpu-batch.sub --debug command1 named:command2
+> gpu-batch.sub --debug --batch 2 command1 command2 named:command3
 >>>>>>>>>>
 #SUBMIT: 0
 vvvvvvvvvv
@@ -65,7 +67,7 @@ vvvvvvvvvv
 #BSUB -q normal
 #BSUB -n 1
 #BSUB -J gpu-batch.sub
-#BSUB -gpu "num=1:mode=exclusive_process"
+#BSUB -gpu "num=1:mode=shared"
 #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
 cd ${LS_SUBCWD}
 mkdir -p bsub-log/out
@@ -73,43 +75,75 @@ mkdir -p bsub-log/err
 command1 >\
   bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.err &\
 command2 >\
-  bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1-named.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1-named.err
+  bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1.err
+
+>>>>>>>>>>
+#SUBMIT: 1
+vvvvvvvvvv
+#!/bin/sh
+#BSUB -q normal
+#BSUB -n 1
+#BSUB -J gpu-batch.sub
+#BSUB -gpu "num=1:mode=shared"
+#BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
+cd ${LS_SUBCWD}
+mkdir -p bsub-log/out
+mkdir -p bsub-log/err
+command3 >\
+  bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0-named.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0-named.err
+
 ```
 
-Where
-
-- general summary
-    `bsub-log/out/gpu-batch.sub-%J-stats.out`
-- stdout/stderr for job1
-    `bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.out`; `bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.err`
-- stdout/stderr for job2
-    `bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1-named.out`; `bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1-named.err`
-
-Arguments
----------
+Program Description
+-------------------
 ```
-       [-h] [--batch BATCH] [--gpu GPU] [--out OUT] [--err ERR] [--name NAME]
-       [--hosts HOSTS] [--files FILES [FILES ...]] [--queue QUEUE] [--debug]
-       [jobs [jobs ...]]
+usage: gpu-batch.sub [-h] [--batch BATCH] [--gpu GPU] [--out OUT] [--err ERR]
+                     [--name NAME] [--hosts HOSTS] [--files FILES [FILES ...]]
+                     [--queue QUEUE] [--exclusive] [--debug] [--version]
+                     [jobs [jobs ...]]
+
+gpu-batch.sub is a util to wrap submissions to LSF in a batch. It
+automatically collects jobs, prepares submission file you can check beforehand
+with `--debug` flag. `gpu-batch.sub` asks LSF for desired number of GPU per
+batch and allocates them in shared or exclusive (not recommended) mode.
 
 positional arguments:
-  jobs                  jobs to execute like 'python script.py', you can
-                        specify either files or explicit jobs (default: [])
+  jobs                  Jobs to execute (e.g. 'python script.py') enclosed as
+                        strings, you can specify either files or explicit jobs
+                        in command line. Multiline jobs in files are
+                        supported. Optional naming schema for jobs has the
+                        following syntax 'name:command' (default: [])
 
 optional arguments:
   -h, --help            show this help message and exit
   --batch BATCH, -b BATCH
-                        number of jobs in batch where -1 stands for unlimited
+                        Number of jobs in batch where -1 stands for unlimited
                         batch (default: -1)
-  --gpu GPU, -g GPU     number of gpu per batch (default: 1)
-  --out OUT, -o OUT     output path for stdout (default: bsub-log/out)
-  --err ERR, -e ERR     output path for stderr (default: bsub-log/err)
-  --name NAME, -n NAME  name for job, defaults to base directory of execution
+  --gpu GPU, -g GPU     Number of gpu per batch (default: 1)
+  --out OUT, -o OUT     Output path for stdout (default: bsub-log/out)
+  --err ERR, -e ERR     Output path for stderr (default: bsub-log/err)
+  --name NAME, -n NAME  Name for job, defaults to base directory of execution
                         (default: $(basename `pwd`))
-  --hosts HOSTS         allowed hosts (default: )
+  --hosts HOSTS         Space or comma separated allowed hosts. Empty string
+                        holds for ALL visible hosts. It is suggested to
+                        specify hosts in `.conf` file. Passing hosts in
+                        command line looks like `--hosts ''` for ALL or
+                        `--hosts 'host1,host2'` for 2 hosts (default: )
   --files FILES [FILES ...], -f FILES [FILES ...]
-                        Read jobs from file (default: [])
+                        Read jobs from files. File can contain multiline jobs
+                        for readability (default: [])
   --queue QUEUE, -q QUEUE
-                        queue name (default: normal)
-  --debug               prints commands to execute first (default: False)
+                        Queue name (default: normal)
+  --exclusive, -x       Exclusive GPU mode is possible but not recommended in
+                        most cases. Exclusive mode allocates GPU only for 1
+                        separate process. As a side effect it breaks batched
+                        jobs and applicable only for 1 job per batch (default:
+                        shared)
+  --debug               Print submissions and exit (default: False)
+  --version             Print version and exit (default: False)
+
+Default settings are stored in `$HOME/.gpubatch.conf`. They will override the
+help message as well. Possible settings for config file: batch, gpu, hosts,
+header, queue. Header will appended to LSF submission file as is, there is no
+default extra header.
 ```
