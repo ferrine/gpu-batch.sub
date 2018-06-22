@@ -14,7 +14,7 @@ def get_version():
 
 if __name__ == '__main__':
     try:
-        LONG_DESC = open('README.md').read()
+        LONG_DESC = open('README.rst').read()
     except FileNotFoundError:
         LONG_DESC = None
 
