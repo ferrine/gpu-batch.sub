@@ -21,6 +21,7 @@ if __name__ == '__main__':
     setup(
         name='gpu-batch-sub',
         description='Batch bsub launcher',
+        url='https://github.com/ferrine/gpu-batch.sub',
         long_description=LONG_DESC,
         version=get_version(),
         author='Maxim Kochurov',
@@ -28,10 +29,10 @@ if __name__ == '__main__':
         python_requires='>=3.5',
         scripts=['gpu-batch.sub'],
         license="Apache License, Version 2.0",
-        classifiers=(
+        classifiers=[
             'Programming Language :: Python :: 3',
             'License :: OSI Approved :: Apache Software License',
             'Topic :: Scientific/Engineering',
-            'Operating System :: Linux'
-        )
+            'Operating System :: OS Independent'
+        ]
     )
