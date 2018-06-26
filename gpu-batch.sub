@@ -181,7 +181,7 @@ if __name__ == '__main__':
                         help='Queue name')
     parser.add_argument('--exclusive', '-x', action='store_const',
                         default='shared',
-                        const='exclusive',
+                        const='exclusive_process',
                         dest='gpu_mode',
                         help='Exclusive GPU mode is possible but not recommended in most cases. Exclusive mode ' 
                              'allocates GPU only for 1 separate process. As a side effect it '
