@@ -62,6 +62,10 @@ Examples
     # special syntax is applied (no spaces allowed in jobname)
     gpu-batch.sub 'jobname : python script1.py'
 
+    # running sequential jobs
+    # yields 2 jobs with sequentially running commands
+    > gpu-batch.sub -b 2 -s 'python script_1.py' 'python script_2.py' 'python script_2.py --other-args'
+
 Checking Command Submission
 ---------------------------
 
@@ -82,11 +86,13 @@ Checking Command Submission
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
+    {
     command1 >\
-      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.err &\
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.0.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.0.0.err ;
+    } & {
     command2 >\
-      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1.err
-
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.1.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.1.0.err ;
+    } & wait
     >>>>>>>>>>
     #SUBMIT: 1
     vvvvvvvvvv
@@ -99,17 +105,71 @@ Checking Command Submission
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
+    {
     command3 >\
-      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0-named.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0-named.err
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1.0.0-named.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1.0.0-named.err ;
+    } & wait
+
+Running commands from file
+--------------------------
+
+::
+
+    > cat commands
+    command1
+    command2
+    <sequential> # indicates sequential jobs start
+    command3
+    command4
+    </sequential> # indicates sequential jobs end
+    > gpu-batch.sub --debug -b 2 -f commands
+    >>>>>>>>>>
+    #SUBMIT: 0
+    vvvvvvvvvv
+    #!/bin/sh
+    #BSUB -q normal
+    #BSUB -n 1
+    #BSUB -J gpu-batch.sub
+    #BSUB -gpu "num=1:mode=shared"
+    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
+    cd ${LS_SUBCWD}
+    mkdir -p bsub-log/out
+    mkdir -p bsub-log/err
+    {
+    command1 >\
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.0.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.0.0.err ;
+    } & {
+    command2 >\
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.1.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.1.0.err ;
+    } & wait
+    >>>>>>>>>>
+    #SUBMIT: 1
+    vvvvvvvvvv
+    #!/bin/sh
+    #BSUB -q normal
+    #BSUB -n 1
+    #BSUB -J gpu-batch.sub
+    #BSUB -gpu "num=1:mode=shared"
+    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
+    cd ${LS_SUBCWD}
+    mkdir -p bsub-log/out
+    mkdir -p bsub-log/err
+    {
+    command3 >\
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1.0.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1.0.0.err ;
+    command4 >\
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1.0.1.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1.0.1.err ;
+    } & wait
 
 Program Description
 -------------------
 
 ::
 
-    usage: gpu-batch.sub [-h] [--batch BATCH] [--gpu GPU] [--out OUT] [--err ERR]
-                         [--name NAME] [--hosts HOSTS] [--files FILES [FILES ...]]
-                         [--queue QUEUE] [--exclusive] [--debug] [--version]
+    usage: gpu-batch.sub [-h] [--batch BATCH] [--sequential] [--gpu GPU]
+                         [--out OUT] [--err ERR] [--name NAME] [--hosts HOSTS]
+                         [--files FILES [FILES ...]] [--queue QUEUE] [--exclusive]
+                         [--debug] [--version]
                          [jobs [jobs ...]]
 
     gpu-batch.sub is a util to wrap submissions to LSF in a batch. It
@@ -129,6 +189,8 @@ Program Description
       --batch BATCH, -b BATCH
                             Number of jobs in batch where -1 stands for unlimited
                             batch (default: -1)
+      --sequential, -s      Make all jobs sequential within bsub submit (default:
+                            False)
       --gpu GPU, -g GPU     Number of gpu per batch (default: 1)
       --out OUT, -o OUT     Output path for stdout (default: bsub-log/out)
       --err ERR, -e ERR     Output path for stderr (default: bsub-log/err)

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+from typing import *
 import configparser
 import tempfile
 from itertools import islice, chain
 from string import Template
 import argparse
+import io
 import os
 import re
 import pathlib
@@ -11,6 +13,7 @@ __version__ = '0.0.3'
 
 CONFIG_PATH_DEFAULT = str(pathlib.Path.home()/'.gpubatch.conf')
 ARGS_NAME_DEFAULT = '$(basename `pwd`)'
+HOSTS_SUB_REGEX = re.compile('( |,)+')
 
 DESCRIPTION = """
 %(prog)s is a util to wrap submissions to LSF in a batch. It automatically
@@ -24,53 +27,169 @@ They will override the help message as well. Possible settings for config file:
 batch, gpu, hosts, header, queue. Header will be appended to LSF submission file as is, 
 there is no default extra header.
 """
-BSUB_TEMPLATE = Template("""\
+
+
+class Command(object):
+    """
+    Single command that requires output redirect
+    """
+    COMMAND_TEMPLATE = Template("${command} >\\\n  ${out}/${name}-${LSB_JOBID}-${i}.${j}.${k}${suffix}.out "
+                                "2> ${err}/${name}-${LSB_JOBID}-${i}.${j}.${k}${suffix}.err")
+    COMMAND_REGEX = re.compile(
+        r'^((?:\s+)?(?P<suffix>[_a-zA-Z0-9-.]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?')
+
+    def __init__(self, command):
+        command = self.COMMAND_REGEX.match(command).groupdict()
+        self.suffix = command['suffix']
+        self.command = command['command']
+
+    def format(self, i, j, k):
+        return self.COMMAND_TEMPLATE.safe_substitute(
+            command=self.command,
+            suffix=(('-' + self.suffix) if self.suffix is not None else ''),
+            i=i, j=j, k=k
+        )
+
+
+class Job(object):
+    """
+    A bunch of commands that run sequentially
+    ```
+    {
+    command1 ;
+    command2 ;
+    ...
+    }
+    ```
+    """
+    def __init__(self, command: Command, *more: Command):
+        self.commands = (command, ) + more
+
+    def format(self, i, j):
+        out = io.StringIO()
+        out.write('{\n')
+        for k, command in enumerate(self.commands):
+            out.write(command.format(i=i, j=j, k=k))
+            out.write(' ;\n')
+        out.write('}')
+        return out.getvalue()
+
+
+class BatchJobs(object):
+    """
+    Jobs that run in parallel
+    ```
+    {
+    command0.0.0 ;
+    command0.0.1 ;
+    ...
+    } &
+    {
+    command0.1.0 ;
+    command0.1.1 ;
+    ...
+    } &
+    wait
+    ```
+    """
+    def __init__(self, job: Job, *more: Job):
+        self.jobs = (job, ) + more
+
+    def format(self, i):
+        out = io.StringIO()
+        for j, job in enumerate(self.jobs):
+            out.write(job.format(i=i, j=j))
+            out.write(' & ')
+        out.write('wait')
+        return out.getvalue()
+
+
+class Submit(object):
+    BSUB_PREAMBLE = """\
 #!/bin/sh
 #BSUB -q $queue
 #BSUB -n $gpu
 #BSUB -J $name
 #BSUB -gpu "num=$gpu:mode=$gpu_mode"
 #BSUB -o $out/$name-%J-stats.out
-""")
-BSUB_WORKING_DIR = Template("""\
+"""
+    BSUB_WORKING_DIR = """\
 cd ${LS_SUBCWD}
 mkdir -p $out
 mkdir -p $err
-""")
-JOB_TEMPLATE = Template("$job >\\\n  $out/$name-${LSB_JOBID}-$batch.out 2> $err/$name-${LSB_JOBID}-$batch.err")
-JOB_REGEX = re.compile(r'^((?:\s+)?(?P<name>[_a-zA-Z0-9-.]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?')
-HOSTS_SUB_REGEX = re.compile('( |,)+')
+"""
+
+    def __init__(self, batch: BatchJobs, i):
+        self.i = i
+        self.batch = batch
+
+    def format(
+            self, name: str,
+            out: pathlib.Path,
+            err: pathlib.Path,
+            queue: str,
+            hosts: str,
+            gpu: int,
+            gpu_mode: str,
+            header: str):
+        sh = io.StringIO()
+        sh.write(self.BSUB_PREAMBLE)
+        if hosts:
+            sh.write('#BSUB -m "%s"' % hosts)
+            sh.write('\n')
+        if header:
+            sh.write(header)
+            sh.write('\n')
+        sh.write(self.BSUB_WORKING_DIR)
+        sh.write(self.batch.format(i=self.i))
+        return Template(sh.getvalue()).safe_substitute(
+            out=out, err=err, queue=queue, name=name,
+            gpu=gpu, gpu_mode=gpu_mode
+        )
 
 
-def possibly_multiline_jobs(lines):
-    jobs = []
+def commands_from_file_lines(lines: Iterable[str], *, force_sequential=False) -> Iterable[Iterable[str]]:
+    commands = [[]]
     buffer = ''
-    for line in lines:
+    parallel = not force_sequential
+    for line in filter(lambda s: bool(s.strip()), lines):
         # remove comments and rstrip
-        line = line.split('#', 1)
+        line = line.split('#', 1)[0]
         if not line:
             if buffer:
-                jobs.append(buffer)
+                commands[-1].append(buffer)
+                if parallel:
+                    commands.append([])
             buffer = ''
             continue
         else:
-            line = line[0].rstrip()
+            line = line.rstrip()
         if line.endswith('\\'):
             # next line is the continuation of the command
             # add line tu buffer, add multiline and continue
             buffer += line + '\n'
+        elif line.strip() == '<sequential>' and not force_sequential:
+            assert parallel, 'Wrong syntax, <sequential> followed by <sequential>'
+            parallel = False
+            continue
+        elif line.strip() == '</sequential>' and not force_sequential:
+            assert not parallel, 'Wrong syntax, </sequential> followed by </sequential>'
+            parallel = True
+            commands.append([])
         else:
             if line:
                 buffer += line
             # empty line new command next
             # add job, free buffer and continue
-            if buffer:
-                jobs.append(buffer)
+            commands[-1].append(buffer)
             buffer = ''
-    return jobs
+            if parallel:
+                commands.append([])
+    commands.pop(-1)
+    return commands
 
 
-def to_batch(iterable, n):
+def to_batch(iterable: Iterable, n: int):
     if n == -1:
         yield iter(iterable)
     else:
@@ -78,62 +197,6 @@ def to_batch(iterable, n):
         while True:
             batchiter = islice(sourceiter, n)
             yield chain([next(batchiter)], batchiter)
-
-
-def parallel_jobs(
-        jobs,
-        name: str,
-        out: pathlib.Path,
-        err: pathlib.Path
-):
-    job_commands = []
-    for j, job in enumerate(jobs):
-        jobd = JOB_REGEX.match(job).groupdict()
-        job_commands.append(
-            JOB_TEMPLATE.safe_substitute(
-                job=jobd['command'], name=name, out=out, err=err,
-                batch='%d-%s' % (j, jobd['name']) if jobd['name'] else j)
-        )
-
-    return BSUB_WORKING_DIR.safe_substitute(out=out, err=err) + ' &\\\n'.join(job_commands) + '\n'
-
-
-def bsub_command(
-        job: str,
-        name: str,
-        out: pathlib.Path,
-        queue: str,
-        hosts: str,
-        gpu: int,
-        gpu_mode: str,
-        header: str
-):
-    command = BSUB_TEMPLATE.substitute(hosts=hosts, gpu=gpu, queue=queue,
-                                       name=name, out=out, gpu_mode=gpu_mode)
-    if hosts:
-        command += '#BSUB -m "%s"\n' % hosts
-    if header:
-        command += header + '\n'
-    command += job
-    return command
-
-
-def bsub_submits(
-        jobs,
-        name: str,
-        out: pathlib.Path,
-        err: pathlib.Path,
-        batch_size: int,
-        queue: str,
-        hosts: str,
-        gpu: int,
-        gpu_mode: str,
-        header: str,
-):
-    jobs = (parallel_jobs(chunks, name=name, out=out, err=err) for chunks in to_batch(jobs, batch_size))
-    commands = [bsub_command(job, header=header, gpu=gpu, queue=queue,
-                             hosts=hosts, name=name, out=out, gpu_mode=gpu_mode) for job in jobs]
-    return commands
 
 
 if __name__ == '__main__':
@@ -147,6 +210,9 @@ if __name__ == '__main__':
     parser.add_argument('--batch', '-b', type=int,
                         default=defaults.get('batch', -1),
                         help='Number of jobs in batch where -1 stands for unlimited batch')
+    parser.add_argument('--sequential', '-s',
+                        action='store_true',
+                        help='Make all jobs sequential within bsub submit')
     parser.add_argument('--gpu', '-g', type=int,
                         default=defaults.get('gpu', 1),
                         help='Number of gpu per batch')
@@ -183,47 +249,56 @@ if __name__ == '__main__':
                         default='shared',
                         const='exclusive_process',
                         dest='gpu_mode',
-                        help='Exclusive GPU mode is possible but not recommended in most cases. Exclusive mode ' 
+                        help='Exclusive GPU mode is possible but not recommended in most cases. Exclusive mode '
                              'allocates GPU only for 1 separate process. As a side effect it '
                              'breaks batched jobs and applicable only for 1 job per batch')
     parser.add_argument('--debug', action='store_true',
                         help='Print submissions and exit')
     parser.add_argument('--version', action='store_true',
                         help='Print version and exit')
-
     args = parser.parse_args()
     if args.version:
         import sys
         print(__version__)
         sys.exit(0)
     if args.files:
-        args.jobs = sum((possibly_multiline_jobs(f.readlines()) for f in args.files), [])
+        args.jobs = sum((commands_from_file_lines(f.readlines()) for f in args.files), [])
+    else:
+        args.jobs = [[job] for job in args.jobs]
     if args.name == ARGS_NAME_DEFAULT:
         args.name = pathlib.Path.cwd().name
     if args.hosts:
         args.hosts = HOSTS_SUB_REGEX.sub(' ', args.hosts)
-    submits = bsub_submits(
-        jobs=args.jobs,
-        header=defaults.get('header', ''),
-        name=args.name,
-        queue=args.queue,
+    if args.sequential:
+        batches = ((Job(*(Command(c) for c in commands)), )
+                   for commands in
+                   to_batch(sum(args.jobs, []), args.batch))
+    else:
+        batches = to_batch([
+            Job(*(Command(c) for c in commands))
+            for commands in args.jobs],
+            args.batch)
+    submits = [Submit(BatchJobs(*b), i) for i, b in enumerate(batches)]
+    params = dict(
         out=args.out,
         err=args.err,
-        batch_size=args.batch,
-        gpu=args.gpu,
         hosts=args.hosts,
-        gpu_mode=args.gpu_mode
+        queue=args.queue,
+        gpu=args.gpu,
+        gpu_mode=args.gpu_mode,
+        name=args.name,
+        header=defaults.get('header', '')
     )
     if args.debug:
         for i, submit in enumerate(submits):
             print('>' * 10)
             print('#SUBMIT:', i)
             print('v' * 10)
-            print(submit)
+            print(submit.format(**params))
     else:
         for submit in submits:
             with tempfile.NamedTemporaryFile('w', delete=False) as f:
-                f.write(submit)
+                f.write(submit.format(**params))
                 f.close()
                 os.system('bsub < ' + f.name)
                 os.unlink(f.name)
