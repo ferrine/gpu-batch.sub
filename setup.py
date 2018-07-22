@@ -28,6 +28,7 @@ if __name__ == '__main__':
         author_email='maxim.v.kochurov@gmail.com',
         python_requires='>=3.5',
         scripts=['gpu-batch.sub'],
+        tests_require=open('requirements-dev.txt').readlines(),
         license="Apache License, Version 2.0",
         classifiers=[
             'Programming Language :: Python :: 3',

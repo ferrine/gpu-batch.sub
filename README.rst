@@ -93,6 +93,7 @@ Checking Command Submission
     command2 >\
       bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.1.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.1.0.err ;
     } & wait
+
     >>>>>>>>>>
     #SUBMIT: 1
     vvvvvvvvvv
@@ -142,6 +143,7 @@ Running commands from file
     command2 >\
       bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.1.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.1.0.err ;
     } & wait
+
     >>>>>>>>>>
     #SUBMIT: 1
     vvvvvvvvvv
@@ -169,7 +171,7 @@ Program Description
     usage: gpu-batch.sub [-h] [--batch BATCH] [--sequential] [--gpu GPU]
                          [--out OUT] [--err ERR] [--name NAME] [--hosts HOSTS]
                          [--files FILES [FILES ...]] [--queue QUEUE] [--exclusive]
-                         [--debug] [--version]
+                         [--debug] [--bsub-bin BSUB_BIN] [--version]
                          [jobs [jobs ...]]
 
     gpu-batch.sub is a util to wrap submissions to LSF in a batch. It
@@ -212,6 +214,7 @@ Program Description
                             jobs and applicable only for 1 job per batch (default:
                             shared)
       --debug               Print submissions and exit (default: False)
+      --bsub-bin BSUB_BIN   bsub binary path (default: bsub)
       --version             Print version and exit (default: False)
 
     Default settings are stored in `$HOME/.gpubatch.conf`. They will override the
