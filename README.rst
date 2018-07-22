@@ -78,11 +78,11 @@ Checking Command Submission
     #SUBMIT: 0
     vvvvvvvvvv
     #!/bin/sh
+    #BSUB -J gpu-batch.sub
+    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -J gpu-batch.sub
     #BSUB -gpu "num=1:mode=shared"
-    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -97,11 +97,11 @@ Checking Command Submission
     #SUBMIT: 1
     vvvvvvvvvv
     #!/bin/sh
+    #BSUB -J gpu-batch.sub
+    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -J gpu-batch.sub
     #BSUB -gpu "num=1:mode=shared"
-    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -127,11 +127,11 @@ Running commands from file
     #SUBMIT: 0
     vvvvvvvvvv
     #!/bin/sh
+    #BSUB -J gpu-batch.sub
+    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -J gpu-batch.sub
     #BSUB -gpu "num=1:mode=shared"
-    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -146,11 +146,11 @@ Running commands from file
     #SUBMIT: 1
     vvvvvvvvvv
     #!/bin/sh
+    #BSUB -J gpu-batch.sub
+    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -J gpu-batch.sub
     #BSUB -gpu "num=1:mode=shared"
-    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
