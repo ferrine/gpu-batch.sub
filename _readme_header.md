@@ -54,4 +54,8 @@ multiline \
 # naming jobs
 # special syntax is applied (no spaces allowed in jobname)
 gpu-batch.sub 'jobname : python script1.py'
+
+# running sequential jobs
+# yields 2 jobs with sequentially running commands
+> gpu-batch.sub -b 2 -s 'python script_1.py' 'python script_2.py' 'python script_2.py --other-args'
 ```
