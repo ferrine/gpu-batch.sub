@@ -156,7 +156,7 @@ class GpuOption(Option):
 # https://www.ibm.com/support/knowledgecenter/en/SSWRJV_10.1.0/lsf_command_ref/bsub.gpu.1.html
 @register
 class GpuModeOption(Option):
-    template = Template('#BSUB -gpu "num=$gpu:j_exclusive=$exclusive"')
+    template = Template('#BSUB -gpu "num=$gpu:j_exclusive=$exclusive:mode=shared"')
 
     def active(self, **kwargs):
         return OptionInfo(

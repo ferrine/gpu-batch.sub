@@ -82,7 +82,7 @@ Checking Command Submission
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:j_exclusive=no"
+    #BSUB -gpu "num=1:j_exclusive=no:mode=shared"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -102,7 +102,7 @@ Checking Command Submission
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:j_exclusive=no"
+    #BSUB -gpu "num=1:j_exclusive=no:mode=shared"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -132,7 +132,7 @@ Running commands from file
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:j_exclusive=no"
+    #BSUB -gpu "num=1:j_exclusive=no:mode=shared"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -152,7 +152,7 @@ Running commands from file
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:j_exclusive=no"
+    #BSUB -gpu "num=1:j_exclusive=no:mode=shared"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
