@@ -82,7 +82,7 @@ Checking Command Submission
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:mode=shared"
+    #BSUB -gpu "num=1:j_exclusive=no"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -102,7 +102,7 @@ Checking Command Submission
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:mode=shared"
+    #BSUB -gpu "num=1:j_exclusive=no"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -132,7 +132,7 @@ Running commands from file
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:mode=shared"
+    #BSUB -gpu "num=1:j_exclusive=no"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -152,7 +152,7 @@ Running commands from file
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:mode=shared"
+    #BSUB -gpu "num=1:j_exclusive=no"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
@@ -208,11 +208,8 @@ Program Description
                             for readability (default: [])
       --queue QUEUE, -q QUEUE
                             Queue name (default: normal)
-      --exclusive, -x       Exclusive GPU mode is possible but not recommended in
-                            most cases. Exclusive mode allocates GPU only for 1
-                            separate process. As a side effect it breaks batched
-                            jobs and applicable only for 1 job per batch (default:
-                            shared)
+      --exclusive, -x       Exclusive mode allocates GPU only for 1 separate job.
+                            (default: no)
       --debug               Print submissions and exit (default: False)
       --bsub-bin BSUB_BIN   bsub binary path (default: bsub)
       --version             Print version and exit (default: False)
