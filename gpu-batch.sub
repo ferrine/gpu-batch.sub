@@ -10,11 +10,12 @@ import io
 import os
 import re
 import pathlib
-__version__ = '0.1.0'
 
-CONFIG_PATH_DEFAULT = str(pathlib.Path.home()/'.gpubatch.conf')
-ARGS_NAME_DEFAULT = '$(basename `pwd`)'
-HOSTS_SUB_REGEX = re.compile('( |,)+')
+__version__ = "0.1.0"
+
+CONFIG_PATH_DEFAULT = str(pathlib.Path.home() / ".gpubatch.conf")
+ARGS_NAME_DEFAULT = "$(basename `pwd`)"
+HOSTS_SUB_REGEX = re.compile("( |,)+")
 
 DESCRIPTION = """
 %(prog)s is a util to wrap submissions to LSF in a batch. It automatically
@@ -34,22 +35,27 @@ class Command(object):
     """
     Single command that requires output redirect
     """
+
     COMMAND_TEMPLATE = Template(
         "${command} >\\\n  ${out}/${name}-${LSB_JOBID}-${i}.${j}.${k}${suffix}.out "
-        "2> ${err}/${name}-${LSB_JOBID}-${i}.${j}.${k}${suffix}.err")
+        "2> ${err}/${name}-${LSB_JOBID}-${i}.${j}.${k}${suffix}.err"
+    )
     COMMAND_REGEX = re.compile(
-        r'^((?:\s+)?(?P<suffix>[_a-zA-Z0-9-.]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?')
+        r"^((?:\s+)?(?P<suffix>[_a-zA-Z0-9-.]+)(?:\s+)?:)?((?:\s+)?(?P<command>(?:.|\n|\r)+)(?:\s+)?)?"
+    )
 
     def __init__(self, command: str):
         command = self.COMMAND_REGEX.match(command).groupdict()
-        self.suffix = command['suffix']
-        self.command = command['command']
+        self.suffix = command["suffix"]
+        self.command = command["command"]
 
     def format(self, i: int, j: int, k: int) -> str:
         return self.COMMAND_TEMPLATE.safe_substitute(
             command=self.command,
-            suffix=(('-' + self.suffix) if self.suffix is not None else ''),
-            i=i, j=j, k=k
+            suffix=(("-" + self.suffix) if self.suffix is not None else ""),
+            i=i,
+            j=j,
+            k=k,
         )
 
 
@@ -64,16 +70,17 @@ class Job(object):
     }
     ```
     """
+
     def __init__(self, command: Command, *more: Command):
-        self.commands = (command, ) + more
+        self.commands = (command,) + more
 
     def format(self, i: int, j: int) -> str:
         out = io.StringIO()
-        out.write('{\n')
+        out.write("{\n")
         for k, command in enumerate(self.commands):
             out.write(command.format(i=i, j=j, k=k))
-            out.write(' ;\n')
-        out.write('}')
+            out.write(" ;\n")
+        out.write("}")
         return out.getvalue()
 
 
@@ -92,19 +99,20 @@ class BatchJobs(object):
     } & wait
     ```
     """
+
     def __init__(self, job: Job, *more: Job):
-        self.jobs = (job, ) + more
+        self.jobs = (job,) + more
 
     def format(self, i: int) -> str:
         out = io.StringIO()
         for j, job in enumerate(self.jobs):
             out.write(job.format(i=i, j=j))
-            out.write(' & ')
-        out.write('wait')
+            out.write(" & ")
+        out.write("wait")
         return out.getvalue()
 
 
-OptionInfo = collections.namedtuple('OptionInfo', 'active,keys')
+OptionInfo = collections.namedtuple("OptionInfo", "active,keys")
 REGISTERED_OPTIONS = []
 
 
@@ -124,33 +132,34 @@ class Option(object):
         info = self.active(**kwargs)
         if info.active:
             if not set(info.keys).issubset(kwargs):
-                raise ValueError('Not all keys for Option {} are provided: {}'.format(
-                    self.__class__.__name__, set(info.keys) - set(kwargs)))
+                raise ValueError(
+                    "Not all keys for Option {} are provided: {}".format(
+                        self.__class__.__name__, set(info.keys) - set(kwargs)
+                    )
+                )
             if self.safe_substitute:
-                return self.template.safe_substitute(**kwargs) + '\n'
+                return self.template.safe_substitute(**kwargs) + "\n"
             else:
-                return self.template.substitute(**kwargs) + '\n'
+                return self.template.substitute(**kwargs) + "\n"
         else:
-            return ''
+            return ""
 
 
 # OPTIONS USED IN RENDERING
 @register
 class QueueOption(Option):
-    template = Template('#BSUB -q $queue')
+    template = Template("#BSUB -q $queue")
 
     def active(self, **kwargs):
-        return OptionInfo(True, ['queue'])
+        return OptionInfo(True, ["queue"])
 
 
 @register
 class GpuOption(Option):
-    template = Template('#BSUB -n $gpu')
+    template = Template("#BSUB -n $gpu")
 
     def active(self, **kwargs):
-        return OptionInfo(
-            bool(kwargs.get('gpu')),
-            ['gpu'])
+        return OptionInfo(bool(kwargs.get("gpu")), ["gpu"])
 
 
 @register
@@ -159,9 +168,9 @@ class GpuModeOption(Option):
 
     def active(self, **kwargs):
         return OptionInfo(
-            bool(kwargs.get('gpu')) and
-            bool(kwargs.get('gpu_mode')),
-            ['gpu', 'gpu_mode'])
+            bool(kwargs.get("gpu")) and bool(kwargs.get("gpu_mode")),
+            ["gpu", "gpu_mode"],
+        )
 
 
 @register
@@ -169,19 +178,15 @@ class HostsOption(Option):
     template = Template('#BSUB -m "$hosts"')
 
     def active(self, **kwargs):
-        return OptionInfo(
-            bool(kwargs.get('hosts')),
-            ['hosts'])
+        return OptionInfo(bool(kwargs.get("hosts")), ["hosts"])
 
 
 @register
 class HeaderOption(Option):
-    template = Template('$header')
+    template = Template("$header")
 
     def active(self, **kwargs):
-        return OptionInfo(
-            bool(kwargs.get('header')),
-            ['header'])
+        return OptionInfo(bool(kwargs.get("header")), ["header"])
 
 
 class Submit(object):
@@ -191,47 +196,43 @@ class Submit(object):
 
     def format(self, **kwargs):
         sh = io.StringIO()
-        sh.write('#!/bin/sh\n'
-                 '#BSUB -J $name\n'
-                 '#BSUB -o $out/$name-%J-stats.out\n')
+        sh.write("#!/bin/sh\n" "#BSUB -J $name\n" "#BSUB -o $out/$name-%J-stats.out\n")
         for option in REGISTERED_OPTIONS:
             sh.write(option.format(**kwargs))
-        sh.write('cd ${LS_SUBCWD}\n'
-                 'mkdir -p $out\n'
-                 'mkdir -p $err\n')
+        sh.write("cd ${LS_SUBCWD}\n" "mkdir -p $out\n" "mkdir -p $err\n")
         sh.write(self.batch.format(i=self.i))
-        sh.write('\n')
+        sh.write("\n")
         return Template(sh.getvalue()).safe_substitute(
-            name=kwargs['name'], out=kwargs['out'], err=kwargs['err']
+            name=kwargs["name"], out=kwargs["out"], err=kwargs["err"]
         )
 
 
 def commands_from_file_lines(lines: Iterable[str]) -> Iterable[Iterable[str]]:
     commands = [[]]
-    buffer = ''
+    buffer = ""
     parallel = True
     for line in filter(lambda s: bool(s.strip()), lines):
         # remove comments and rstrip
-        line = line.split('#', 1)[0]
+        line = line.split("#", 1)[0]
         if not line:
             if buffer:
                 commands[-1].append(buffer)
                 if parallel:
                     commands.append([])
-            buffer = ''
+            buffer = ""
             continue
         else:
             line = line.rstrip()
-        if line.endswith('\\'):
+        if line.endswith("\\"):
             # next line is the continuation of the command
             # add line tu buffer, add multiline and continue
-            buffer += line + '\n'
-        elif line.strip() == '<sequential>':
-            assert parallel, 'Wrong syntax, <sequential> followed by <sequential>'
+            buffer += line + "\n"
+        elif line.strip() == "<sequential>":
+            assert parallel, "Wrong syntax, <sequential> followed by <sequential>"
             parallel = False
             continue
-        elif line.strip() == '</sequential>':
-            assert not parallel, 'Wrong syntax, </sequential> followed by </sequential>'
+        elif line.strip() == "</sequential>":
+            assert not parallel, "Wrong syntax, </sequential> followed by </sequential>"
             parallel = True
             commands.append([])
         else:
@@ -240,7 +241,7 @@ def commands_from_file_lines(lines: Iterable[str]) -> Iterable[Iterable[str]]:
             # empty line new command next
             # add job, free buffer and continue
             commands[-1].append(buffer)
-            buffer = ''
+            buffer = ""
             if parallel:
                 commands.append([])
     commands.pop(-1)
@@ -259,89 +260,138 @@ def to_batch(iterable: Iterable, n: int):
 
 def finalize_namespace(namespace):
     if namespace.files:
-        namespace.jobs = sum((commands_from_file_lines(f.readlines()) for f in namespace.files), [])
+        namespace.jobs = sum(
+            (commands_from_file_lines(f.readlines()) for f in namespace.files), []
+        )
     else:
         namespace.jobs = [[job] for job in namespace.jobs]
     if namespace.name == ARGS_NAME_DEFAULT:
         namespace.name = pathlib.Path.cwd().name
     if namespace.hosts:
-        namespace.hosts = HOSTS_SUB_REGEX.sub(' ', namespace.hosts)
+        namespace.hosts = HOSTS_SUB_REGEX.sub(" ", namespace.hosts)
     return namespace
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     defaults = dict()
     if os.path.exists(CONFIG_PATH_DEFAULT):
-        conf = configparser.ConfigParser(comment_prefixes=(';',))
+        conf = configparser.ConfigParser(comment_prefixes=(";",))
         conf.read([CONFIG_PATH_DEFAULT])
-        defaults.update(conf.items('gpubatch'))
-    parser = argparse.ArgumentParser(description=DESCRIPTION, epilog=EPILOG,
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--batch', '-b', type=int,
-                        default=defaults.get('batch', -1),
-                        help='Number of jobs in batch where -1 stands for unlimited batch')
-    parser.add_argument('--sequential', '-s',
-                        action='store_true',
-                        help='Make all jobs sequential within bsub submit')
-    parser.add_argument('--gpu', '-g', type=int,
-                        default=defaults.get('gpu', 1),
-                        help='Number of gpu per batch')
-    parser.add_argument('--out', '-o', type=pathlib.Path,
-                        default=defaults.get('out', pathlib.Path('bsub-log', 'out')),
-                        help='Output path for stdout')
-    parser.add_argument('--err', '-e', type=pathlib.Path,
-                        default=defaults.get('err', pathlib.Path('bsub-log', 'err')),
-                        help='Output path for stderr')
-    parser.add_argument('--name', '-n', type=str,
-                        default=ARGS_NAME_DEFAULT,
-                        help='Name for job, defaults to base directory of execution')
-    parser.add_argument('--hosts', type=str,
-                        default=defaults.get('hosts', ''),
-                        help='Space or comma separated allowed hosts. '
-                             'Empty string holds for ALL visible hosts. '
-                             'It is suggested to specify hosts in `.conf` file. '
-                             'Passing hosts in command line looks like '
-                             "`--hosts ''` for ALL or `--hosts 'host1,host2'` for 2 hosts")
+        defaults.update(conf.items("gpubatch"))
+    parser = argparse.ArgumentParser(
+        description=DESCRIPTION,
+        epilog=EPILOG,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--batch",
+        "-b",
+        type=int,
+        default=defaults.get("batch", -1),
+        help="Number of jobs in batch where -1 stands for unlimited batch",
+    )
+    parser.add_argument(
+        "--sequential",
+        "-s",
+        action="store_true",
+        help="Make all jobs sequential within bsub submit",
+    )
+    parser.add_argument(
+        "--gpu",
+        "-g",
+        type=int,
+        default=defaults.get("gpu", 1),
+        help="Number of gpu per batch",
+    )
+    parser.add_argument(
+        "--out",
+        "-o",
+        type=pathlib.Path,
+        default=defaults.get("out", pathlib.Path("bsub-log", "out")),
+        help="Output path for stdout",
+    )
+    parser.add_argument(
+        "--err",
+        "-e",
+        type=pathlib.Path,
+        default=defaults.get("err", pathlib.Path("bsub-log", "err")),
+        help="Output path for stderr",
+    )
+    parser.add_argument(
+        "--name",
+        "-n",
+        type=str,
+        default=ARGS_NAME_DEFAULT,
+        help="Name for job, defaults to base directory of execution",
+    )
+    parser.add_argument(
+        "--hosts",
+        type=str,
+        default=defaults.get("hosts", ""),
+        help="Space or comma separated allowed hosts. "
+        "Empty string holds for ALL visible hosts. "
+        "It is suggested to specify hosts in `.conf` file. "
+        "Passing hosts in command line looks like "
+        "`--hosts ''` for ALL or `--hosts 'host1,host2'` for 2 hosts",
+    )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--files', '-f', type=argparse.FileType('r'), nargs='+',
-                       default=[],
-                       help='Read jobs from files. File can contain multiline jobs for readability')
-    group.add_argument('jobs', nargs='*', type=str,
-                       default=[],
-                       help="Jobs to execute (e.g. 'python script.py') enclosed as strings, "
-                            "you can specify either files or explicit jobs in command line. "
-                            "Multiline jobs in files are supported. Optional naming schema for jobs has "
-                            "the following syntax 'name:command'")
-    parser.add_argument('--queue', '-q', type=str,
-                        default=defaults.get('queue', 'normal'),
-                        help='Queue name')
-    parser.add_argument('--exclusive', '-x', action='store_const',
-                        default='shared',
-                        const='exclusive_process',
-                        dest='gpu_mode',
-                        help='Exclusive GPU mode is possible but not recommended in most cases. Exclusive mode '
-                             'allocates GPU only for 1 separate process. As a side effect it '
-                             'breaks batched jobs and applicable only for 1 job per batch')
-    parser.add_argument('--debug', action='store_true',
-                        help='Print submissions and exit')
-    parser.add_argument('--bsub-bin', default='bsub', help='bsub binary path')
-    parser.add_argument('--version', action='store_true',
-                        help='Print version and exit')
+    group.add_argument(
+        "--files",
+        "-f",
+        type=argparse.FileType("r"),
+        nargs="+",
+        default=[],
+        help="Read jobs from files. File can contain multiline jobs for readability",
+    )
+    group.add_argument(
+        "jobs",
+        nargs="*",
+        type=str,
+        default=[],
+        help="Jobs to execute (e.g. 'python script.py') enclosed as strings, "
+        "you can specify either files or explicit jobs in command line. "
+        "Multiline jobs in files are supported. Optional naming schema for jobs has "
+        "the following syntax 'name:command'",
+    )
+    parser.add_argument(
+        "--queue",
+        "-q",
+        type=str,
+        default=defaults.get("queue", "normal"),
+        help="Queue name",
+    )
+    parser.add_argument(
+        "--exclusive",
+        "-x",
+        action="store_const",
+        default="shared",
+        const="exclusive_process",
+        dest="gpu_mode",
+        help="Exclusive GPU mode is possible but not recommended in most cases. Exclusive mode "
+        "allocates GPU only for 1 separate process. As a side effect it "
+        "breaks batched jobs and applicable only for 1 job per batch",
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="Print submissions and exit"
+    )
+    parser.add_argument("--bsub-bin", default="bsub", help="bsub binary path")
+    parser.add_argument("--version", action="store_true", help="Print version and exit")
     args = parser.parse_args()
     if args.version:
         import sys
+
         print(__version__)
         sys.exit(0)
     args = finalize_namespace(args)
     if args.sequential:
-        batches = ((Job(*(Command(c) for c in commands)), )
-                   for commands in
-                   to_batch(sum(args.jobs, []), args.batch))
+        batches = (
+            (Job(*(Command(c) for c in commands)),)
+            for commands in to_batch(sum(args.jobs, []), args.batch)
+        )
     else:
-        batches = to_batch([
-            Job(*(Command(c) for c in commands))
-            for commands in args.jobs],
-            args.batch)
+        batches = to_batch(
+            [Job(*(Command(c) for c in commands)) for commands in args.jobs], args.batch
+        )
     submits = [Submit(BatchJobs(*b), i) for i, b in enumerate(batches)]
     params = dict(
         out=args.out,
@@ -351,18 +401,18 @@ if __name__ == '__main__':
         gpu=args.gpu,
         gpu_mode=args.gpu_mode,
         name=args.name,
-        header=defaults.get('header', '')
+        header=defaults.get("header", ""),
     )
     if args.debug:
         for i, submit in enumerate(submits):
-            print('>' * 10)
-            print('#SUBMIT:', i)
-            print('v' * 10)
+            print(">" * 10)
+            print("#SUBMIT:", i)
+            print("v" * 10)
             print(submit.format(**params))
     else:
         for submit in submits:
-            with tempfile.NamedTemporaryFile('w', delete=False) as f:
+            with tempfile.NamedTemporaryFile("w", delete=False) as f:
                 f.write(submit.format(**params))
                 f.close()
-                os.system(args.bsub_bin + ' < ' + f.name)
+                os.system(args.bsub_bin + " < " + f.name)
                 os.unlink(f.name)
