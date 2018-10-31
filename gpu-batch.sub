@@ -153,15 +153,16 @@ class GpuOption(Option):
             ['gpu'])
 
 
+# https://www.ibm.com/support/knowledgecenter/en/SSWRJV_10.1.0/lsf_command_ref/bsub.gpu.1.html
 @register
 class GpuModeOption(Option):
-    template = Template('#BSUB -gpu "num=$gpu:mode=$gpu_mode"')
+    template = Template('#BSUB -gpu "num=$gpu:j_exclusive=$exclusive:mode=shared"')
 
     def active(self, **kwargs):
         return OptionInfo(
             bool(kwargs.get('gpu')) and
-            bool(kwargs.get('gpu_mode')),
-            ['gpu', 'gpu_mode'])
+            bool(kwargs.get('exclusive')),
+            ['gpu', 'exclusive'])
 
 
 @register
@@ -316,12 +317,9 @@ if __name__ == '__main__':
                         default=defaults.get('queue', 'normal'),
                         help='Queue name')
     parser.add_argument('--exclusive', '-x', action='store_const',
-                        default='shared',
-                        const='exclusive_process',
-                        dest='gpu_mode',
-                        help='Exclusive GPU mode is possible but not recommended in most cases. Exclusive mode '
-                             'allocates GPU only for 1 separate process. As a side effect it '
-                             'breaks batched jobs and applicable only for 1 job per batch')
+                        default='no',
+                        const='yes',
+                        help='Exclusive mode allocates GPU only for 1 separate job.')
     parser.add_argument('--debug', action='store_true',
                         help='Print submissions and exit')
     parser.add_argument('--bsub-bin', default='bsub', help='bsub binary path')
@@ -349,7 +347,7 @@ if __name__ == '__main__':
         hosts=args.hosts,
         queue=args.queue,
         gpu=args.gpu,
-        gpu_mode=args.gpu_mode,
+        exclusive=args.exclusive,
         name=args.name,
         header=defaults.get('header', '')
     )
