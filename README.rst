@@ -177,7 +177,7 @@ Running single command, no quotes
     #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
     #BSUB -q normal
     #BSUB -n 1
-    #BSUB -gpu "num=1:mode=shared"
+    #BSUB -gpu "num=1:j_exclusive=no:mode=shared"
     cd ${LS_SUBCWD}
     mkdir -p bsub-log/out
     mkdir -p bsub-log/err
