@@ -25,6 +25,13 @@ readme:
 	@./gpu-batch.sub --debug -b 2 -f tmp.commands >> README.md
 	@echo '```' 						>> README.md
 	@echo >> README.md
+	@echo >> README.md
+	@echo 'Running single command, no quotes'	>> README.md
+	@echo '--------------------------'	>> README.md
+	@echo '```' 						>> README.md
+	@echo '> gpu-batch.sub --debug -C python main.py' >> README.md
+	@./gpu-batch.sub --debug -C python main.py >> README.md
+	@echo '```' 						>> README.md
 	@echo 'Program Description' >> README.md
 	@echo '-------------------' >> README.md
 	@echo '```' 						>> README.md

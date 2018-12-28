@@ -260,8 +260,10 @@ def to_batch(iterable: Iterable, n: int):
 def finalize_namespace(namespace):
     if namespace.files:
         namespace.jobs = sum((commands_from_file_lines(f.readlines()) for f in namespace.files), [])
-    else:
+    elif namespace.jobs:
         namespace.jobs = [[job] for job in namespace.jobs]
+    else:
+        namespace.jobs = [[" ".join(namespace.C)]]
     if namespace.name == ARGS_NAME_DEFAULT:
         namespace.name = pathlib.Path.cwd().name
     if namespace.hosts:
@@ -312,6 +314,9 @@ if __name__ == '__main__':
                             "you can specify either files or explicit jobs in command line. "
                             "Multiline jobs in files are supported. Optional naming schema for jobs has "
                             "the following syntax 'name:command'")
+    group.add_argument('-C', nargs="*", type=str,
+                       default=[],
+                       help="Single command, does not require quotes")
     parser.add_argument('--queue', '-q', type=str,
                         default=defaults.get('queue', 'normal'),
                         help='Queue name')

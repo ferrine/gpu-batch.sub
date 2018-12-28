@@ -163,6 +163,29 @@ Running commands from file
       bsub-log/out/gpu-batch.sub-${LSB_JOBID}-1.0.1.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-1.0.1.err ;
     } & wait
 
+Running single command, no quotes
+---------------------------------
+
+::
+
+    > gpu-batch.sub --debug -C python main.py
+    >>>>>>>>>>
+    #SUBMIT: 0
+    vvvvvvvvvv
+    #!/bin/sh
+    #BSUB -J gpu-batch.sub
+    #BSUB -o bsub-log/out/gpu-batch.sub-%J-stats.out
+    #BSUB -q normal
+    #BSUB -n 1
+    #BSUB -gpu "num=1:mode=shared"
+    cd ${LS_SUBCWD}
+    mkdir -p bsub-log/out
+    mkdir -p bsub-log/err
+    {
+    python main.py >\
+      bsub-log/out/gpu-batch.sub-${LSB_JOBID}-0.0.0.out 2> bsub-log/err/gpu-batch.sub-${LSB_JOBID}-0.0.0.err ;
+    } & wait
+
 Program Description
 -------------------
 
@@ -170,8 +193,9 @@ Program Description
 
     usage: gpu-batch.sub [-h] [--batch BATCH] [--sequential] [--gpu GPU]
                          [--out OUT] [--err ERR] [--name NAME] [--hosts HOSTS]
-                         [--files FILES [FILES ...]] [--queue QUEUE] [--exclusive]
-                         [--debug] [--bsub-bin BSUB_BIN] [--version]
+                         [--files FILES [FILES ...]] [-C [C [C ...]]]
+                         [--queue QUEUE] [--exclusive] [--debug]
+                         [--bsub-bin BSUB_BIN] [--version]
                          [jobs [jobs ...]]
 
     gpu-batch.sub is a util to wrap submissions to LSF in a batch. It
@@ -206,6 +230,7 @@ Program Description
       --files FILES [FILES ...], -f FILES [FILES ...]
                             Read jobs from files. File can contain multiline jobs
                             for readability (default: [])
+      -C [C [C ...]]        Single command, does not require quotes (default: [])
       --queue QUEUE, -q QUEUE
                             Queue name (default: normal)
       --exclusive, -x       Exclusive GPU mode is possible but not recommended in
