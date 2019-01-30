@@ -358,7 +358,7 @@ if __name__ == "__main__":
     )
     group.add_argument(
         "-C",
-        nargs="*",
+        nargs=argparse.REMAINDER,
         type=str,
         default=[],
         help="Single command, does not require quotes",
