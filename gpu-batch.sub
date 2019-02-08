@@ -11,7 +11,7 @@ import os
 import re
 import pathlib
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 CONFIG_PATH_DEFAULT = str(pathlib.Path.home() / ".gpubatch.conf")
 ARGS_NAME_DEFAULT = "$(basename `pwd`)"
